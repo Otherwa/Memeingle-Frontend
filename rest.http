@@ -1,0 +1,24 @@
+POST http://localhost:5000/api/register
+Content-Type: application/json
+
+{
+    "email": "testuser@gmail.com",
+    "password": "testpassword"
+}
+
+####
+
+POST http://localhost:5000/api/login
+Content-Type: application/json
+
+{
+    "email": "testuser@gmail.com",
+    "password": "testpassword"
+}
+
+####
+
+GET http://localhost:5000/api/user
+Content-Type: application/json
+Authorization: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjp7ImlkIjoiNjY0NWM5MTBkZjUwNDFlODQyMjVhZmU1In0sImlhdCI6MTcxNTg0OTY0OCwiZXhwIjoxNzE1ODUzMjQ4fQ.XafqQtTay9IkZvFjds-X9NuGNSQYtRuYdbv4ez5Wp5w
+
