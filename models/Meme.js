@@ -8,7 +8,6 @@ const memeSchema = new Schema({
     Url: { type: String, required: true },
     Subreddit: { type: String, required: true },
     UpVotes: { type: Number, required: true },
-    liked: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }]
 });
 
 // Create a Mongoose model from the schema

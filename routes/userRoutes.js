@@ -10,7 +10,14 @@ const Meme = require('../models/Meme');
 router.get('/user', auth, async (req, res) => {
     try {
         const user = await User.findById(req.user.id).select('-password');
-        const userStats = await Meme.find({ liked: req.user.id }, { "Url": 1, "Title": 1, "Author": 1, "UpVotes": 1 },)
+        console.log(user.liked);
+
+        const meme = user.liked.map(item => item.toString());
+
+        const userStats = await Meme.find(
+            { _id: { $in: meme } },
+            { "Url": 1, "Title": 1, "Author": 1, "UpVotes": 1 }
+        );
         const response = { user, userStats }
 
         res.json(response);
