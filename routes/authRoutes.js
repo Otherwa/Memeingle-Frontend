@@ -44,7 +44,7 @@ router.post('/login', async (req, res) => {
             return res.status(400).json({ message: "Invalid credentials" });
         }
         // Generate JWT token
-        const payload = { user: { id: user.id } };
+        const payload = { user: { id: user.id, email: user.email } };
         const token = jwt.sign(payload, 'Tatakae', { expiresIn: 216000 }); // Change secret and expiration
         res.json({ token });
     } catch (error) {

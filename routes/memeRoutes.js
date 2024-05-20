@@ -11,6 +11,8 @@ router.get('/memelist', auth, async (req, res) => {
     try {
         const APP_ENGINE_URL = process.env.APP_ENGINE_URL;
         const userId = req.user.id;
+        const userEmail = req.user.email;
+        console.log(userEmail);
         // Call the FastAPI endpoint to get the list of memes
         const response = await axios.get(APP_ENGINE_URL + `recommendations/${userId}`);
         const recommendations = response.data.recommendations;
