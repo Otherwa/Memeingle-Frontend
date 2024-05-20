@@ -3,20 +3,22 @@ const router = express.Router();
 const auth = require('../middleware/auth'); // Middleware to verify JWT token
 const Meme = require('../models/Meme');
 const User = require('../models/User');
+const axios = require('axios');
 
 // Get user data
 
-router.get('/memelist/:userid', auth, async (req, res) => {
+router.get('/memelist', auth, async (req, res) => {
     try {
+        const APP_ENGINE_URL = process.env.APP_ENGINE_URL;
+        const userId = req.user.id;
+        // Call the FastAPI endpoint to get the list of memes
+        const response = await axios.get(APP_ENGINE_URL + `recommendations/${userId}`);
+        const recommendations = response.data.recommendations;
 
-        // ? Python Rec Engine
-        const memes = await Meme.find({}, { "_id": 1, "Url": 1, "Title": 1, "Author": 1, "UpVotes": 1 });
-        const memeList = memes.map(meme => ({ id: meme._id.toString(), Url: meme.Url, Title: meme.Title, Author: meme.Author, UpVotes: meme.UpVotes }));
+        // Fetch memes from MongoDB based on the recommendation IDs
+        const memes = await Meme.find({ _id: { $in: recommendations } }, { "_id": 1, "Url": 1, "Title": 1, "Author": 1, "UpVotes": 1 });
 
-
-
-        res.json(memeList);
-
+        res.json(memes);
     } catch (error) {
         console.error("Error fetching meme list:", error);
         res.status(500).json({ message: "Internal Server Error" });

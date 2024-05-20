@@ -10,7 +10,6 @@ const Meme = require('../models/Meme');
 router.get('/user', auth, async (req, res) => {
     try {
         const user = await User.findById(req.user.id).select('-password');
-        console.log(user.liked);
 
         const meme = user.liked.map(item => item.toString());
 

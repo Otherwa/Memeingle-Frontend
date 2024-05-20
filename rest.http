@@ -12,13 +12,13 @@ POST http://localhost:5000/api/login
 Content-Type: application/json
 
 {
-    "email": "testuser@gmail.com",
-    "password": "testpassword"
+    "email": "atharvdesai2002@gmail.com",
+    "password": "Gokussj@12345"
 }
 
 ####
 
-GET http://localhost:5000/api/user
+GET http://localhost:5000/api/memelist
 Content-Type: application/json
-Authorization: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjp7ImlkIjoiNjY0NWM5MTBkZjUwNDFlODQyMjVhZmU1In0sImlhdCI6MTcxNTg0OTY0OCwiZXhwIjoxNzE1ODUzMjQ4fQ.XafqQtTay9IkZvFjds-X9NuGNSQYtRuYdbv4ez5Wp5w
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjp7ImlkIjoiNjY0NWVjZjZhZjAwZDU5ZjExZjI5MTg2In0sImlhdCI6MTcxNjEyMjQ3OCwiZXhwIjoxNzE2MzM4NDc4fQ._FKtqs6NodqoZ--zC9wwUIf7zu9wtxVW4Vh9uW9xqyM
 
