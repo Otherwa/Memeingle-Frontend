@@ -15,11 +15,13 @@ router.post('/register', async (req, res) => {
             return res.status(400).json({ message: "User already exists" });
         }
         // Create new user
-        user = new User({ email, password });
+        const initialLikedMemeId = '664626828f760c694ebd9745';
+        user = new User({ email, password, liked: [initialLikedMemeId] });
         // Hash password
         const salt = await bcrypt.genSalt(10);
         user.password = await bcrypt.hash(password, salt);
         // Save user to database
+
         await user.save();
         res.status(201).json({ message: "User registered successfully" });
     } catch (error) {

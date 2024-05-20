@@ -6,6 +6,8 @@ const auth = require('../middleware/auth'); // Middleware to verify JWT token
 const User = require('../models/User');
 const Meme = require('../models/Meme');
 
+
+
 // Get user data
 router.get('/user', auth, async (req, res) => {
     try {
