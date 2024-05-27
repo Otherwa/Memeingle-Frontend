@@ -13,7 +13,8 @@ const app = express();
 // Middleware
 // Enable CORS for all routes
 app.use(cors());
-app.use(express.json());
+// ! load
+app.use(express.json({ limit: '50mb' }));
 
 // Routes
 app.use('/api', authRoutes);

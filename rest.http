@@ -12,13 +12,17 @@ POST http://localhost:5000/api/login
 Content-Type: application/json
 
 {
-    "email": "Swaraj.m@somaiya.edu",
-    "password": "12345678"
+    "email": "riyakadamvpp@gmail.com",
+    "password": "riya1313"
 }
 
 ####
 
 GET http://localhost:5000/api/memelist
 Content-Type: application/json
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjp7ImlkIjoiNjY0YjM3ZGRlZjQwMThhNGVmN2QyODJiIiwiZW1haWwiOiJTd2FyYWoubUBzb21haXlhLmVkdSJ9LCJpYXQiOjE3MTYyMDc1MjIsImV4cCI6MTcxNjQyMzUyMn0.rDSDg-MRBZMm87FDCcY8_ZZq615_CPp9vDv5bauDab8
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjp7ImlkIjoiNjY0YjI5MTBlZjQwMThhNGVmN2QyNzkyIiwiZW1haWwiOiJyaXlha2FkYW12cHBAZ21haWwuY29tIn0sImlhdCI6MTcxNjgwOTIzOSwiZXhwIjoxNzE3MDI1MjM5fQ.tVsogNurtruUyq3xiccBRZsaI-nv7Noyof-fE-BMt74
 
+####
+GET http://localhost:5000/api/user/peeps
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjp7ImlkIjoiNjY0YjI5MTBlZjQwMThhNGVmN2QyNzkyIiwiZW1haWwiOiJyaXlha2FkYW12cHBAZ21haWwuY29tIn0sImlhdCI6MTcxNjgwOTIzOSwiZXhwIjoxNzE3MDI1MjM5fQ.tVsogNurtruUyq3xiccBRZsaI-nv7Noyof-fE-BMt74
