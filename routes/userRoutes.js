@@ -72,6 +72,8 @@ router.get('/user/peeps', auth, async (req, res) => {
             };
         });
 
+        combinedData.sort((a, b) => b.similarityScore - a.similarityScore);
+
         res.json({ peeps: combinedData });
     } catch (error) {
         console.error(error);
