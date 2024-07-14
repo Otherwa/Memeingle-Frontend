@@ -6,6 +6,7 @@ const router = express.Router();
 const auth = require('../middleware/auth'); // Middleware to verify JWT token
 const User = require('../models/User');
 const Meme = require('../models/Meme');
+const Message = require('../models/Messages');
 const axios = require('axios');
 
 // Update User Data
@@ -45,6 +46,44 @@ router.get('/user', auth, async (req, res) => {
     }
 });
 
+// Post messaging user dat
+router.post('/user/:id', auth, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const user = await User.findById(id).select('-password -liked');
+        const response = { user }
+
+        res.json(response);
+
+    } catch (error) {
+        console.error('Error fetching user data:', error);
+        res.status(500).json({ message: "Internal Server Error" });
+    }
+});
+
+// Get Similar Users based on your similar interests
+router.get('/user/peep/:id', auth, async (req, res) => {
+    try {
+
+        const userId = req.params.id;
+
+        const peep = await User.find(
+            { _id: userId },
+            { liked: 0, password: 0 }
+        );
+
+        if (!peep) {
+            res.json({ peeps: null })
+        }
+
+
+        res.json({ peep: peep });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
 // Get Similar Users based on your similar interests
 router.get('/user/peeps', auth, async (req, res) => {
     try {
@@ -78,6 +117,46 @@ router.get('/user/peeps', auth, async (req, res) => {
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Server error' });
+    }
+});
+
+
+// GET messages by securityKey
+router.get('/messages', async (req, res) => {
+    const { securityKey } = req.query;
+    const securityKeyDup = securityKey.split("_");
+    const securityKeyRev = securityKeyDup[1] + "_" + securityKeyDup[0];
+
+    console.log(securityKey)
+    console.log(securityKeyRev)
+
+    try {
+        const messages_u1 = await Message.find({ 'securityKey': securityKey });
+        const messages_u2 = await Message.find({ 'securityKey': securityKeyRev });
+        const messages = [...messages_u1, ...messages_u2];
+
+        messages.sort((a, b) => {
+            return new Date(a.timestamp) - new Date(b.timestamp);
+        });
+
+        res.json(messages);
+    } catch (error) {
+        console.error('Error fetching messages:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+// POST a new message
+router.post('/messages', async (req, res) => {
+    const { text, senderId, timestamp, securityKey } = req.body;
+    console.log(req.body);
+    try {
+        const newMessage = new Message({ text, senderId, timestamp, securityKey });
+        await newMessage.save();
+        res.status(201).json(newMessage);
+    } catch (error) {
+        console.error('Error saving message:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
     }
 });
 
