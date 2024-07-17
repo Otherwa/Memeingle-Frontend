@@ -1,43 +1,43 @@
-// routes/userRoutes.js
-require('dotenv').config()
+// ? routes/userRoutes.js
 
+// ? Required modules
+require('dotenv').config(); // ? Load environment variables
 const express = require('express');
 const router = express.Router();
-const auth = require('../middleware/auth'); // Middleware to verify JWT token
+const auth = require('../middleware/auth'); // ? Middleware to verify JWT token
 const User = require('../models/User');
 const Meme = require('../models/Meme');
 const Message = require('../models/Messages');
 const axios = require('axios');
 
-// Update User Data
+// ? Update User Data
 router.post('/user', auth, async (req, res) => {
-    const userData = req.body
+    const userData = req.body;
     console.log(userData);
     const { hobbies, bio, gender, avatar } = userData.data;
 
-
     try {
         await User.findOneAndUpdate({ "_id": req.user.id }, { "hobbies": hobbies, "bio": bio, "gender": gender, "avatar": avatar });
-        res.json({ msg: "Updated" })
+        res.json({ msg: "Updated" });
     } catch (error) {
-        console.error('Error fetching user data:', error);
+        console.error('Error updating user data:', error);
         res.status(500).json({ message: "Internal Server Error" });
     }
 });
 
-// Get user data
+// ? Get user data
 router.get('/user', auth, async (req, res) => {
     try {
         const user = await User.findById(req.user.id).select('-password');
 
-        const meme = user.liked.map(item => item.toString());
-
+        // ? Fetching memes liked by the user
+        const memeIds = user.liked.map(item => item.toString());
         const userStats = await Meme.find(
-            { _id: { $in: meme } },
+            { _id: { $in: memeIds } },
             { "Url": 1, "Title": 1, "Author": 1, "UpVotes": 1 }
         );
-        const response = { user, userStats }
 
+        const response = { user, userStats };
         res.json(response);
 
     } catch (error) {
@@ -46,98 +46,86 @@ router.get('/user', auth, async (req, res) => {
     }
 });
 
-// Post messaging user dat
+// ? Fetch user data by ID
 router.post('/user/:id', auth, async (req, res) => {
     try {
         const { id } = req.params;
         const user = await User.findById(id).select('-password -liked');
-        const response = { user }
-
+        const response = { user };
         res.json(response);
 
     } catch (error) {
-        console.error('Error fetching user data:', error);
+        console.error('Error fetching user data by ID:', error);
         res.status(500).json({ message: "Internal Server Error" });
     }
 });
 
-// Get Similar Users based on your similar interests
+// ? Get similar users based on interests
 router.get('/user/peep/:id', auth, async (req, res) => {
     try {
-
         const userId = req.params.id;
-
-        const peep = await User.find(
-            { _id: userId },
-            { liked: 0, password: 0 }
-        );
+        const peep = await User.findById(userId, { liked: 0, password: 0 });
 
         if (!peep) {
-            res.json({ peeps: null })
+            return res.json({ peep: null });
         }
 
-
-        res.json({ peep: peep });
+        res.json({ peep });
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Server error' });
+        console.error('Error fetching similar users:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
     }
 });
 
-// Get Similar Users based on your similar interests
+// ? Get similar users based on interests from an external service
 router.get('/user/peeps', auth, async (req, res) => {
     try {
         const APP_ENGINE_URL = process.env.APP_ENGINE_URL;
         const userId = req.user.id;
 
+        // ? Fetching similar peeps data from an external service
         const response = await axios.get(`${APP_ENGINE_URL}similar/${userId}`);
-        const similar_peeps = response.data;
+        const similarPeeps = response.data;
 
-        const similar_peeps_keys = Object.keys(similar_peeps.data);
+        const similarPeepIds = Object.keys(similarPeeps.data);
 
+        // ? Fetching user data for similar peeps
         const peeps = await User.find(
-            { _id: { $in: similar_peeps_keys } },
+            { _id: { $in: similarPeepIds } },
             { liked: 0, password: 0 }
         );
 
-        // Convert similarityScores to a Map for quick lookups
-        const similarityMap = new Map(Object.entries(similar_peeps.data));
-
+        // ? Mapping similarity scores to each user
+        const similarityMap = new Map(Object.entries(similarPeeps.data));
         const combinedData = peeps.map(user => {
-            const similarityScore = similarityMap.get(user._id.toString());
-            return {
-                ...user.toObject(),
-                similarityScore: similarityScore !== undefined ? similarityScore : null
-            };
+            const similarityScore = similarityMap.get(user._id.toString()) || null;
+            return { ...user.toObject(), similarityScore };
         });
 
+        // ? Sorting users by similarity score
         combinedData.sort((a, b) => b.similarityScore - a.similarityScore);
 
         res.json({ peeps: combinedData });
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Server error' });
+        console.error('Error fetching similar peeps:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
     }
 });
 
-
-// GET messages by securityKey
+// ? Fetch messages by securityKey
 router.get('/messages', async (req, res) => {
     const { securityKey } = req.query;
     const securityKeyDup = securityKey.split("_");
     const securityKeyRev = securityKeyDup[1] + "_" + securityKeyDup[0];
 
-    console.log(securityKey)
-    console.log(securityKeyRev)
-
     try {
+        // ? Fetching messages for both directions of securityKey
         const messages_u1 = await Message.find({ 'securityKey': securityKey });
         const messages_u2 = await Message.find({ 'securityKey': securityKeyRev });
         const messages = [...messages_u1, ...messages_u2];
 
-        messages.sort((a, b) => {
-            return new Date(a.timestamp) - new Date(b.timestamp);
-        });
+        // ? Sorting messages by timestamp
+        messages.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
 
         res.json(messages);
     } catch (error) {
@@ -146,11 +134,11 @@ router.get('/messages', async (req, res) => {
     }
 });
 
-// POST a new message
+// ? Post a new message
 router.post('/messages', async (req, res) => {
     const { text, senderId, timestamp, securityKey } = req.body;
-    console.log(req.body);
     try {
+        // ? Saving a new message
         const newMessage = new Message({ text, senderId, timestamp, securityKey });
         await newMessage.save();
         res.status(201).json(newMessage);
