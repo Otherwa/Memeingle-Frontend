@@ -50,15 +50,26 @@ router.get('/user', auth, async (req, res) => {
 router.post('/user/:id', auth, async (req, res) => {
     try {
         const { id } = req.params;
-        const user = await User.findById(id).select('-password -liked');
-        const response = { user };
-        res.json(response);
+        let user = await User.findById(id).select('-password');
+
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+
+        // Assign likedmemes property to user object
+        user.likedmemes = user.liked.length;
+        user.liked = null;
+
+        const response = { "user": user };
+        res.json(response); // Send the response with user object including likedmemes
 
     } catch (error) {
         console.error('Error fetching user data by ID:', error);
         res.status(500).json({ message: "Internal Server Error" });
     }
 });
+
+
 
 // ? Get similar users based on interests
 router.get('/user/peep/:id', auth, async (req, res) => {
@@ -113,7 +124,7 @@ router.get('/user/peeps', auth, async (req, res) => {
 });
 
 // ? Fetch messages by securityKey
-router.get('/messages', async (req, res) => {
+router.get('/messages', auth, async (req, res) => {
     const { securityKey } = req.query;
     const securityKeyDup = securityKey.split("_");
     const securityKeyRev = securityKeyDup[1] + "_" + securityKeyDup[0];
@@ -135,7 +146,7 @@ router.get('/messages', async (req, res) => {
 });
 
 // ? Post a new message
-router.post('/messages', async (req, res) => {
+router.post('/messages', auth, async (req, res) => {
     const { text, senderId, timestamp, securityKey } = req.body;
     try {
         // ? Saving a new message

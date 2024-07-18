@@ -9,7 +9,8 @@ const userSchema = new mongoose.Schema({
     hobbies: { type: String },
     bio: { type: String },
     gender: { type: String },
-    avatar: { type: String }
+    avatar: { type: String },
+    likedmemes: { type: Number, default: 0 }
 }, { timestamps: true });
 
 module.exports = mongoose.model('User', userSchema);

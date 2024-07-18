@@ -1,57 +1,162 @@
-require('dotenv').config()
-
+require('dotenv').config(); // Load environment variables
 const express = require('express');
+const apicache = require('apicache');
 const router = express.Router();
 const auth = require('../middleware/auth'); // Middleware to verify JWT token
-const Meme = require('../models/Meme');
 const User = require('../models/User');
+const Meme = require('../models/Meme');
+const Message = require('../models/Messages');
 const axios = require('axios');
 
-// Get user data
+// Initialize cache
+const cache = apicache.middleware;
 
-router.get('/memelist', auth, async (req, res) => {
+// Update User Data
+router.post('/user', auth, async (req, res) => {
+    const userData = req.body;
+    console.log(userData);
+    const { hobbies, bio, gender, avatar } = userData.data;
+
+    try {
+        await User.findOneAndUpdate({ "_id": req.user.id }, { "hobbies": hobbies, "bio": bio, "gender": gender, "avatar": avatar });
+        apicache.clear(`/user/${req.user.id}`); // Clear cache for this user
+        res.json({ msg: "Updated" });
+    } catch (error) {
+        console.error('Error updating user data:', error);
+        res.status(500).json({ message: "Internal Server Error" });
+    }
+});
+
+// Get user data
+router.get('/user', auth, cache('5 minutes'), async (req, res) => {
+    try {
+        const user = await User.findById(req.user.id).select('-password');
+
+        // Fetching memes liked by the user
+        const memeIds = user.liked.map(item => item.toString());
+        const userStats = await Meme.find(
+            { _id: { $in: memeIds } },
+            { "Url": 1, "Title": 1, "Author": 1, "UpVotes": 1 }
+        );
+
+        const response = { user, userStats };
+        res.json(response);
+
+    } catch (error) {
+        console.error('Error fetching user data:', error);
+        res.status(500).json({ message: "Internal Server Error" });
+    }
+});
+
+// Fetch user data by ID
+router.post('/user/:id', auth, cache('5 minutes'), async (req, res) => {
+    try {
+        const { id } = req.params;
+        let user = await User.findById(id).select('-password');
+
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+
+        // Assign likedmemes property to user object
+        user.likedmemes = user.liked.length;
+        user.liked = null;
+
+        const response = { "user": user };
+        res.json(response); // Send the response with user object including likedmemes
+
+    } catch (error) {
+        console.error('Error fetching user data by ID:', error);
+        res.status(500).json({ message: "Internal Server Error" });
+    }
+});
+
+// Get similar users based on interests
+router.get('/user/peep/:id', auth, cache('5 minutes'), async (req, res) => {
+    try {
+        const userId = req.params.id;
+        const peep = await User.findById(userId, { liked: 0, password: 0 });
+
+        if (!peep) {
+            return res.json({ peep: null });
+        }
+
+        res.json({ peep });
+    } catch (error) {
+        console.error('Error fetching similar users:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+// Get similar users based on interests from an external service
+router.get('/user/peeps', auth, cache('5 minutes'), async (req, res) => {
     try {
         const APP_ENGINE_URL = process.env.APP_ENGINE_URL;
         const userId = req.user.id;
-        const userEmail = req.user.email;
-        console.log(userEmail);
-        // Call the FastAPI endpoint to get the list of memes
-        const response = await axios.get(APP_ENGINE_URL + `recommendations/${userId}`);
-        const recommendations = response.data.recommendations;
 
-        // Fetch memes from MongoDB based on the recommendation IDs
-        const memes = await Meme.find({ _id: { $in: recommendations } }, { "_id": 1, "Url": 1, "Title": 1, "Author": 1, "UpVotes": 1 });
+        // Fetching similar peeps data from an external service
+        const response = await axios.get(`${APP_ENGINE_URL}similar/${userId}`);
+        const similarPeeps = response.data;
 
-        res.json(memes);
+        const similarPeepIds = Object.keys(similarPeeps.data);
+
+        // Fetching user data for similar peeps
+        const peeps = await User.find(
+            { _id: { $in: similarPeepIds } },
+            { liked: 0, password: 0 }
+        );
+
+        // Mapping similarity scores to each user
+        const similarityMap = new Map(Object.entries(similarPeeps.data));
+        const combinedData = peeps.map(user => {
+            const similarityScore = similarityMap.get(user._id.toString()) || null;
+            return { ...user.toObject(), similarityScore };
+        });
+
+        // Sorting users by similarity score
+        combinedData.sort((a, b) => b.similarityScore - a.similarityScore);
+
+        res.json({ peeps: combinedData });
     } catch (error) {
-        console.error("Error fetching meme list:", error);
-        res.status(500).json({ message: "Internal Server Error" });
+        console.error('Error fetching similar peeps:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
     }
 });
 
-router.post('/like/:id', auth, async (req, res) => {
+// Fetch messages by securityKey
+router.get('/messages', cache('5 minutes'), async (req, res) => {
+    const { securityKey } = req.query;
+    const securityKeyDup = securityKey.split("_");
+    const securityKeyRev = securityKeyDup[1] + "_" + securityKeyDup[0];
+
     try {
-        const memeId = req.params.id;
-        const userId = req.user.id; // Assuming you have user information in the request object after authentication
+        // Fetching messages for both directions of securityKey
+        const messages_u1 = await Message.find({ 'securityKey': securityKey });
+        const messages_u2 = await Message.find({ 'securityKey': securityKeyRev });
+        const messages = [...messages_u1, ...messages_u2];
 
-        // Check if the user has already liked the meme
-        const alreadyLiked = await Meme.exists({ _id: memeId, liked: userId });
-        if (alreadyLiked) {
-            return res.status(400).json({ message: "User already liked this meme" });
-        }
+        // Sorting messages by timestamp
+        messages.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
 
-        console.log(`Meme Liked ${memeId} by ${JSON.stringify(req.user)}`);
-        // Update the user to add the user ID to the liked array
-        await User.updateOne({ _id: userId }, { $push: { liked: memeId }, })
-        // Update the meme upvote count
-        await Meme.updateOne({ _id: memeId }, { $inc: { UpVotes: 1 } });
-
-        res.json({ message: "Meme liked successfully" });
+        res.json(messages);
     } catch (error) {
-        console.error("Error liking meme:", error);
-        res.status(500).json({ message: "Internal Server Error" });
+        console.error('Error fetching messages:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
     }
 });
 
+// Post a new message
+router.post('/messages', async (req, res) => {
+    const { text, senderId, timestamp, securityKey } = req.body;
+    try {
+        // Saving a new message
+        const newMessage = new Message({ text, senderId, timestamp, securityKey });
+        await newMessage.save();
+        res.status(201).json(newMessage);
+    } catch (error) {
+        console.error('Error saving message:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
 
 module.exports = router;
