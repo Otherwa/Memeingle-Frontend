@@ -8,16 +8,47 @@ const auth = require('../middleware/auth'); // ? Middleware to verify JWT token
 const User = require('../models/User');
 const Meme = require('../models/Meme');
 const Message = require('../models/Messages');
+const { Deta } = require('deta');
 const axios = require('axios');
+const multer = require('multer');
+
+const deta = Deta(process.env.DETA_KEY);
+const drive = deta.Drive('user_profile');
+
+const upload = multer();
 
 // ? Update User Data
-router.post('/user', auth, async (req, res) => {
-    const userData = req.body;
-    console.log(userData);
-    const { hobbies, bio, gender, avatar } = userData.data;
+router.post('/user', auth, upload.single('avatar'), async (req, res) => {
+    const { hobbies, bio, gender } = req.body;
+    let avatar = null;
 
     try {
-        await User.findOneAndUpdate({ "_id": req.user.id }, { "hobbies": hobbies, "bio": bio, "gender": gender, "avatar": avatar });
+        if (req.file) {
+            // Store the avatar in Deta Drive
+            const buffer = req.file.buffer;
+            const avatarFileName = `${req.user.id}-${Date.now()}.png`;
+            await drive.put(avatarFileName, { data: buffer });
+
+            const user = await User.findById({ "_id": req.user.id })
+            if (user.avatar) {
+                await drive.delete(user.avatar);
+            }
+
+            avatar = avatarFileName;
+        }
+
+        await User.findOneAndUpdate(
+            { "_id": req.user.id },
+            {
+                $set: {
+                    "details.hobbies": hobbies,
+                    "details.bio": bio,
+                    "details.gender": gender,
+                    "avatar": avatar
+                }
+            }
+        );
+
         res.json({ msg: "Updated" });
     } catch (error) {
         console.error('Error updating user data:', error);
@@ -25,19 +56,40 @@ router.post('/user', auth, async (req, res) => {
     }
 });
 
-// ? Get user data
+// ? Fetch User Data
 router.get('/user', auth, async (req, res) => {
     try {
         const user = await User.findById(req.user.id).select('-password');
 
         // ? Fetching memes liked by the user
-        const memeIds = user.liked.map(item => item.toString());
+        const memeIds = user.details.liked.map(item => item.toString());
         const userStats = await Meme.find(
             { _id: { $in: memeIds } },
             { "Url": 1, "Title": 1, "Author": 1, "UpVotes": 1 }
         );
 
-        const response = { user, userStats };
+        // Fetch avatar URL from Deta Drive
+        let avatarBase64 = null;
+        if (user.avatar) {
+            try {
+                const avatarResponse = await drive.get(user.avatar);
+                if (avatarResponse) {
+                    const buffer = await avatarResponse.arrayBuffer();
+                    avatarBase64 = Buffer.from(buffer).toString('base64');
+                }
+            } catch (err) {
+                console.error('Error fetching avatar:', err);
+            }
+        }
+
+        const response = {
+            user: {
+                ...user.toObject(),
+                avatarBase64, // Add the avatar Base64 to the user data
+            },
+            userStats
+        };
+
         res.json(response);
 
     } catch (error) {
@@ -57,10 +109,29 @@ router.post('/user/:id', auth, async (req, res) => {
         }
 
         // Assign likedmemes property to user object
-        user.likedmemes = user.liked.length;
-        user.liked = null;
+        user.details.liked = null;
 
-        const response = { "user": user };
+        let avatarBase64 = null;
+        if (user.avatar) {
+            try {
+                const avatarResponse = await drive.get(user.avatar);
+                if (avatarResponse) {
+                    const buffer = await avatarResponse.arrayBuffer();
+                    avatarBase64 = Buffer.from(buffer).toString('base64');
+                }
+            } catch (err) {
+                console.error('Error fetching avatar:', err);
+            }
+        }
+
+        const response = {
+            "user":
+            {
+                ...user.toObject(),
+                avatarBase64, // Add the avatar Base64 to the user data
+            }
+        };
+
         res.json(response); // Send the response with user object including likedmemes
 
     } catch (error) {
@@ -81,7 +152,29 @@ router.get('/user/peep/:id', auth, async (req, res) => {
             return res.json({ peep: null });
         }
 
-        res.json({ peep });
+        let avatarBase64 = null;
+        if (peep.avatar) {
+            try {
+                const avatarResponse = await drive.get(user.avatar);
+                if (avatarResponse) {
+                    const buffer = await avatarResponse.arrayBuffer();
+                    avatarBase64 = Buffer.from(buffer).toString('base64');
+                }
+            } catch (err) {
+                console.error('Error fetching avatar:', err);
+            }
+        }
+
+        res.json(
+            {
+                "peep":
+                {
+                    ...peep.toObject(),
+                    avatarBase64,
+                }
+            }
+        );
+
     } catch (error) {
         console.error('Error fetching similar users:', error);
         res.status(500).json({ error: 'Internal Server Error' });
@@ -110,6 +203,7 @@ router.get('/user/peeps', auth, async (req, res) => {
         const similarityMap = new Map(Object.entries(similarPeeps.data));
         const combinedData = peeps.map(user => {
             const similarityScore = similarityMap.get(user._id.toString()) || null;
+
             return { ...user.toObject(), similarityScore };
         });
 

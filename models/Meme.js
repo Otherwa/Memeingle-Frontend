@@ -10,6 +10,10 @@ const memeSchema = new Schema({
     UpVotes: { type: Number, required: true },
 });
 
+// Ensure virtual fields are serialized
+memeSchema.set('toJSON', { virtuals: true });
+memeSchema.set('toObject', { virtuals: true });
+
 // Create a Mongoose model from the schema
 const Meme = mongoose.model('Meme', memeSchema);
 
