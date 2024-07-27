@@ -217,40 +217,4 @@ router.get('/user/peeps', auth, async (req, res) => {
     }
 });
 
-// ? Fetch messages by securityKey
-router.get('/messages', auth, async (req, res) => {
-    const { securityKey } = req.query;
-    const securityKeyDup = securityKey.split("_");
-    const securityKeyRev = securityKeyDup[1] + "_" + securityKeyDup[0];
-
-    try {
-        // ? Fetching messages for both directions of securityKey
-        const messages_u1 = await Message.find({ 'securityKey': securityKey });
-        const messages_u2 = await Message.find({ 'securityKey': securityKeyRev });
-        const messages = [...messages_u1, ...messages_u2];
-
-        // ? Sorting messages by timestamp
-        messages.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-
-        res.json(messages);
-    } catch (error) {
-        console.error('Error fetching messages:', error);
-        res.status(500).json({ error: 'Internal Server Error' });
-    }
-});
-
-// ? Post a new message
-router.post('/messages', auth, async (req, res) => {
-    const { text, senderId, timestamp, securityKey } = req.body;
-    try {
-        // ? Saving a new message
-        const newMessage = new Message({ text, senderId, timestamp, securityKey });
-        await newMessage.save();
-        res.status(201).json(newMessage);
-    } catch (error) {
-        console.error('Error saving message:', error);
-        res.status(500).json({ error: 'Internal Server Error' });
-    }
-});
-
 module.exports = router;

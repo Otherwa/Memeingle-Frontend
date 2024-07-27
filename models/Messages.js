@@ -1,26 +1,11 @@
 const mongoose = require('mongoose');
-const Schema = mongoose.Schema;
-
-
 
 // Define the message schema
-const messageSchema = new Schema({
-    from: {
-        type: String,
-        required: true,  // The sender of the message
-    },
-    to: {
-        type: String,
-        required: true,  // The recipient of the message
-    },
-    message: {
-        type: String,
-        required: true,  // The content of the message
-    },
-    timestamp: {
-        type: Date,
-        default: Date.now,  // Automatically set the timestamp to the current date and time
-    },
+const messageSchema = new mongoose.Schema({
+    sender: { type: String, required: true },
+    recipient: { type: String, required: true },
+    message: { type: String, required: true },
+    timestamp: { type: Date, default: Date.now }
 });
 
 // Ensure virtual fields are serialized
