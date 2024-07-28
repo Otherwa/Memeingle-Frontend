@@ -13,6 +13,7 @@ const initSocketServer = (server) => {
 
     io.on('connection', (socket) => {
         console.log('New client connected');
+        console.log(users);
 
         socket.on('register', (username) => {
             users.set(username, socket.id);
@@ -21,39 +22,48 @@ const initSocketServer = (server) => {
         });
 
         socket.on('private_message', async (data) => {
-            // console.log(`Received message data: ${JSON.stringify(data)}`);
             const { sender, recipient, message } = data;
             const newMessage = new Message({ sender, recipient, message, timestamp: new Date() });
             await newMessage.save();
 
-            // console.log(`New message saved: ${JSON.stringify(newMessage)}`);
-
             if (users.has(recipient)) {
                 io.to(users.get(recipient)).emit('new_message', newMessage);
-                // console.log(`Message sent to ${recipient}: ${message}`);
+                console.log(`Message sent to ${recipient}: ${message}`);
             } else {
-                // console.log(`Recipient ${recipient} is not online.`);
+                console.log(`Recipient ${recipient} is not online.`);
             }
 
             io.to(users.get(sender)).emit('new_message', newMessage);
             console.log(`Message sent to ${sender}: ${message}`);
 
-            // Emit user status update
             io.emit('user_status', { username: sender, status: 'online' });
             console.log(`User status emitted for ${sender}: online`);
         });
 
+        socket.on('deregister', (username) => {
+            if (users.has(username)) {
+                users.delete(username);
+                console.log(`${username} deregistered`);
+                io.emit('user_status', { username: username, status: 'offline' });
+            }
+        });
+
         socket.on('disconnect', () => {
+            let disconnectedUser = null;
             users.forEach((value, key) => {
                 if (value === socket.id) {
+                    disconnectedUser = key;
                     users.delete(key);
-                    // console.log(`${key} disconnected`);
-                    // Emit user status update
+                    console.log(`${key} disconnected`);
                     io.emit('user_status', { username: key, status: 'offline' });
-                    // console.log(`User status emitted for ${key}: offline`);
                 }
             });
-            // console.log('Client disconnected');
+
+            if (disconnectedUser) {
+                console.log(`User status emitted for ${disconnectedUser}: offline`);
+            } else {
+                console.log('Client disconnected');
+            }
         });
     });
 
