@@ -7,10 +7,10 @@ const router = express.Router();
 const auth = require('../middleware/auth'); // ? Middleware to verify JWT token
 const User = require('../models/User');
 const Meme = require('../models/Meme');
-const Message = require('../models/Messages');
 const { Deta } = require('deta');
 const axios = require('axios');
 const multer = require('multer');
+const moment = require('moment');
 
 const deta = Deta(process.env.DETA_KEY);
 const drive = deta.Drive('user_profile');
@@ -76,7 +76,7 @@ router.get('/user', auth, async (req, res) => {
 
         const UserStats = userStats.map(item => {
             const likedAt = memeIdToLikedAtMap.get(item._id.toString());
-            const localLikedAt = likedAt ? new Date(likedAt).toLocaleString() : null;
+            const localLikedAt = likedAt ? moment(likedAt).format('MMM Do YY') : null;
 
             return {
                 ...item.toObject(),

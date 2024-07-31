@@ -1,4 +1,5 @@
 require('dotenv').config();
+
 const express = require('express');
 const router = express.Router();
 const Message = require('../models/Messages'); // Make sure this path is correct
