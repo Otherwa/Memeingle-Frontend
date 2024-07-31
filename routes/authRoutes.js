@@ -17,7 +17,11 @@ router.post('/register', async (req, res) => {
         }
         // Create new user
         const INTIAL_MEMELIKED_ID = '664626828f760c694ebd9767';
-        user = new User({ email, password, 'details.liked': [INTIAL_MEMELIKED_ID] });
+        const first_meme = {
+            meme: INTIAL_MEMELIKED_ID,
+            likedAt: new Date()
+        }
+        user = new User({ email, password, 'details.liked': [first_meme] });
         // Hash password
         const salt = await bcrypt.genSalt(10);
         user.password = await bcrypt.hash(password, salt);

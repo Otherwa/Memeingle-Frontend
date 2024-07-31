@@ -67,7 +67,7 @@ router.post('/like/:id', auth, async (req, res) => {
         await User.updateOne(
             { _id: userId },
             {
-                $push: { "details.liked": memeId },
+                $push: { "details.liked": { 'meme': memeId, likedAt: new Date() } },
                 $inc: { likedmemes: 1 }
             },
         );

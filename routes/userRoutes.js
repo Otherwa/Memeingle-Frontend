@@ -59,16 +59,32 @@ router.post('/user', auth, upload.single('avatar'), async (req, res) => {
 // ? Fetch User Data
 router.get('/user', auth, async (req, res) => {
     try {
-        const user = await User.findById(req.user.id).select('-password');
+        let user = await User.findById(req.user.id).select('-password');
 
-        // ? Fetching memes liked by the user
-        const memeIds = user.details.liked.map(item => item.toString());
+        const memeIdToLikedAtMap = new Map(
+            user.details.liked.map(item => [item.meme.toString(), item.likedAt])
+        );
+
+        user.details.liked = null;
+
+        // Fetching memes liked by the user
         const userStats = await Meme.find(
-            { _id: { $in: memeIds } },
+            { _id: { $in: Array.from(memeIdToLikedAtMap.keys()) } },
             { "Url": 1, "Title": 1, "Author": 1, "UpVotes": 1 }
         );
 
-        // Fetch avatar URL from Deta Drive
+
+        const UserStats = userStats.map(item => {
+            const likedAt = memeIdToLikedAtMap.get(item._id.toString());
+            const localLikedAt = likedAt ? new Date(likedAt).toLocaleString() : null;
+
+            return {
+                ...item.toObject(),
+                likedAt: localLikedAt
+            };
+        });
+
+        // ? Fetch avatar URL from Deta Drive
         let avatarBase64 = null;
         if (user.avatar) {
             try {
@@ -87,7 +103,7 @@ router.get('/user', auth, async (req, res) => {
                 ...user.toObject(),
                 avatarBase64, // Add the avatar Base64 to the user data
             },
-            userStats
+            UserStats
         };
 
         res.json(response);
@@ -192,7 +208,7 @@ router.get('/user/peeps', auth, async (req, res) => {
         const similarPeeps = response.data;
 
         const similarPeepIds = Object.keys(similarPeeps.data);
-
+        console.log(similarPeepIds)
         // ? Fetching user data for similar peeps
         const peeps = await User.find(
             { _id: { $in: similarPeepIds } },
