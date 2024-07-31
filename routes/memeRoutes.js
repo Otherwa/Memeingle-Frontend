@@ -46,9 +46,11 @@ router.get('/memelist', auth, async (req, res) => {
         // Call the FastAPI endpoint to get the list of memes
         const response = await axios.get(APP_ENGINE_URL + `recommendations/${userId}`);
         const recommendations = response.data.recommendations;
-
+        console.log(recommendations)
         // Fetch memes from MongoDB based on the recommendation IDs
         const memes = await Meme.find({ _id: { $in: recommendations } }, { "_id": 1, "Url": 1, "Title": 1, "Author": 1, "UpVotes": 1 });
+
+        memes.sort(() => Math.random() - 0.5);
 
         res.json(memes);
     } catch (error) {
