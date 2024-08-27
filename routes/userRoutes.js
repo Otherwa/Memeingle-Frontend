@@ -140,11 +140,15 @@ router.post('/user/:id', auth, async (req, res) => {
             }
         }
 
+        const APP_ENGINE_URL = process.env.APP_ENGINE_URL;
+        const resp = await axios.get(APP_ENGINE_URL + `predict-personality/${id}`);
+
         const response = {
             "user":
             {
                 ...user.toObject(),
                 avatarBase64, // Add the avatar Base64 to the user data
+                ...resp.data
             }
         };
 
@@ -161,9 +165,11 @@ router.post('/user/:id', auth, async (req, res) => {
 // ? Get similar users based on interests
 router.get('/user/peep/:id', auth, async (req, res) => {
     try {
+
         const userId = req.params.id;
         const peep = await User.findById(userId, { liked: 0, password: 0 });
 
+        // get form flask
         if (!peep) {
             return res.json({ peep: null });
         }
