@@ -142,16 +142,16 @@ router.post('/user/:id', auth, async (req, res) => {
 
         const APP_ENGINE_URL = process.env.APP_ENGINE_URL;
         const resp = await axios.get(APP_ENGINE_URL + `predict-personality/${id}`);
-
+        const data = resp.data
         const response = {
             "user":
             {
                 ...user.toObject(),
+                data,
                 avatarBase64, // Add the avatar Base64 to the user data
-                ...resp.data
             }
         };
-
+        console.log(response);
         res.json(response); // Send the response with user object including likedmemes
 
     } catch (error) {
