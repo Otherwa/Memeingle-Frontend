@@ -11,7 +11,7 @@
   "license": "ISC",
   "dependencies": {
     "apicache": "^1.6.3",
-    "axios": "^1.6.8",
+    "axios": "^1.7.4",
     "base64-arraybuffer": "^1.0.2",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
