@@ -1,38 +1,63 @@
-// ? routes/userRoutes.js
+// ? ? routes/userRoutes.js
 
-// ? Required modules
-require('dotenv').config(); // ? Load environment variables
+// ? ? Required modules
+require('dotenv').config(); // ? ? Load environment variables
 const express = require('express');
 const router = express.Router();
-const auth = require('../middleware/auth'); // ? Middleware to verify JWT token
+const auth = require('../middleware/auth'); // ? ? Middleware to verify JWT token
 const User = require('../models/User');
 const Meme = require('../models/Meme');
-const { Deta } = require('deta');
 const axios = require('axios');
 const multer = require('multer');
 const moment = require('moment');
+const mongoose = require('mongoose');
+const Grid = require('gridfs-stream');
+const { Readable } = require('stream');
 
-const deta = Deta(process.env.DETA_KEY);
-const drive = deta.Drive('user_profile');
+// ? Initialize GridFS
+const conn = mongoose.connection;
+let gfs, gridFSBucket;
+
+conn.once('open', () => {
+    gfs = Grid(conn.db, mongoose.mongo);
+    gfs.collection('avatars');  // ? Set the collection to store avatars
+    gridFSBucket = new mongoose.mongo.GridFSBucket(conn.db, {
+        bucketName: 'avatars'  // ? Ensure the bucket name is consistent
+    });
+});
 
 const upload = multer();
 
-// ? Update User Data
+// ? ? Update User Data
 router.post('/user', auth, upload.single('avatar'), async (req, res) => {
     const { hobbies, bio, gender } = req.body;
     let avatar = null;
 
     try {
         if (req.file) {
-            // Store the avatar in Deta Drive
-            const buffer = req.file.buffer;
-            const avatarFileName = `${req.user.id}-${Date.now()}.png`;
-            await drive.put(avatarFileName, { data: buffer });
+            // ? Create a readable stream from the buffer
+            const readableAvatarStream = new Readable();
+            readableAvatarStream.push(req.file.buffer);
+            readableAvatarStream.push(null); // ? End the stream
 
-            const user = await User.findById({ "_id": req.user.id })
+            // ? Define a filename
+            const avatarFileName = `${req.user.id}-${Date.now()}.png`;
+
+            // ? Check if the user already has an avatar, if so delete the old one
+            const user = await User.findById(req.user.id);
             if (user.avatar) {
-                await drive.delete(user.avatar);
+                await gfs.remove({ filename: user.avatar, root: 'avatars' });
             }
+
+            // ? Store the new avatar in GridFS
+            const uploadStream = gridFSBucket.openUploadStream(avatarFileName);
+            readableAvatarStream.pipe(uploadStream);
+
+            // ? Wait until the stream finishes
+            await new Promise((resolve, reject) => {
+                uploadStream.on('finish', resolve);
+                uploadStream.on('error', reject);
+            });
 
             avatar = avatarFileName;
         }
@@ -56,7 +81,7 @@ router.post('/user', auth, upload.single('avatar'), async (req, res) => {
     }
 });
 
-// ? Fetch User Data
+// ? ? Fetch User Data
 router.get('/user', auth, async (req, res) => {
     try {
         let user = await User.findById(req.user.id).select('-password');
@@ -67,12 +92,11 @@ router.get('/user', auth, async (req, res) => {
 
         user.details.liked = null;
 
-        // Fetching memes liked by the user
+        // ? Fetching memes liked by the user
         const userStats = await Meme.find(
             { _id: { $in: Array.from(memeIdToLikedAtMap.keys()) } },
             { "Url": 1, "Title": 1, "Author": 1, "UpVotes": 1 }
         );
-
 
         const UserStats = userStats.map(item => {
             const likedAt = memeIdToLikedAtMap.get(item._id.toString());
@@ -84,15 +108,25 @@ router.get('/user', auth, async (req, res) => {
             };
         });
 
-        // ? Fetch avatar URL from Deta Drive
+        // ? Fetch avatar from GridFS
         let avatarBase64 = null;
         if (user.avatar) {
             try {
-                const avatarResponse = await drive.get(user.avatar);
-                if (avatarResponse) {
-                    const buffer = await avatarResponse.arrayBuffer();
-                    avatarBase64 = Buffer.from(buffer).toString('base64');
-                }
+                const downloadStream = gridFSBucket.openDownloadStreamByName(user.avatar);
+
+                let chunks = [];
+                downloadStream.on('data', (chunk) => {
+                    chunks.push(chunk);
+                });
+
+                await new Promise((resolve, reject) => {
+                    downloadStream.on('end', () => {
+                        const buffer = Buffer.concat(chunks);
+                        avatarBase64 = buffer.toString('base64');
+                        resolve();
+                    });
+                    downloadStream.on('error', reject);
+                });
             } catch (err) {
                 console.error('Error fetching avatar:', err);
             }
@@ -101,7 +135,7 @@ router.get('/user', auth, async (req, res) => {
         const response = {
             user: {
                 ...user.toObject(),
-                avatarBase64, // Add the avatar Base64 to the user data
+                avatarBase64, // ? Add the avatar Base64 to the user data
             },
             UserStats
         };
@@ -114,7 +148,7 @@ router.get('/user', auth, async (req, res) => {
     }
 });
 
-// ? Fetch user data by ID
+// ? ? Fetch user data by ID
 router.post('/user/:id', auth, async (req, res) => {
     try {
         const { id } = req.params;
@@ -124,35 +158,41 @@ router.post('/user/:id', auth, async (req, res) => {
             return res.status(404).json({ message: "User not found" });
         }
 
-        // Assign likedmemes property to user object
-        user.details.liked = null;
-
         let avatarBase64 = null;
         if (user.avatar) {
             try {
-                const avatarResponse = await drive.get(user.avatar);
-                if (avatarResponse) {
-                    const buffer = await avatarResponse.arrayBuffer();
-                    avatarBase64 = Buffer.from(buffer).toString('base64');
-                }
+                const downloadStream = gridFSBucket.openDownloadStreamByName(user.avatar);
+
+                let chunks = [];
+                downloadStream.on('data', (chunk) => {
+                    chunks.push(chunk);
+                });
+
+                await new Promise((resolve, reject) => {
+                    downloadStream.on('end', () => {
+                        const buffer = Buffer.concat(chunks);
+                        avatarBase64 = buffer.toString('base64');
+                        resolve();
+                    });
+                    downloadStream.on('error', reject);
+                });
             } catch (err) {
                 console.error('Error fetching avatar:', err);
             }
         }
 
         const APP_ENGINE_URL = process.env.APP_ENGINE_URL;
-        const resp = await axios.get(APP_ENGINE_URL + `predict-personality/${id}`);
-        const data = resp.data
+        const resp = await axios.get(`${APP_ENGINE_URL}predict-personality/${id}`);
+        const data = resp.data;
         const response = {
-            "user":
-            {
+            "user": {
                 ...user.toObject(),
                 data,
-                avatarBase64, // Add the avatar Base64 to the user data
+                avatarBase64,
             }
         };
         console.log(response);
-        res.json(response); // Send the response with user object including likedmemes
+        res.json(response);
 
     } catch (error) {
         console.error('Error fetching user data by ID:', error);
@@ -160,16 +200,12 @@ router.post('/user/:id', auth, async (req, res) => {
     }
 });
 
-
-
-// ? Get similar users based on interests
+// ? ? Get similar users based on interests
 router.get('/user/peep/:id', auth, async (req, res) => {
     try {
-
         const userId = req.params.id;
         const peep = await User.findById(userId, { liked: 0, password: 0 });
 
-        // get form flask
         if (!peep) {
             return res.json({ peep: null });
         }
@@ -177,25 +213,32 @@ router.get('/user/peep/:id', auth, async (req, res) => {
         let avatarBase64 = null;
         if (peep.avatar) {
             try {
-                const avatarResponse = await drive.get(user.avatar);
-                if (avatarResponse) {
-                    const buffer = await avatarResponse.arrayBuffer();
-                    avatarBase64 = Buffer.from(buffer).toString('base64');
-                }
+                const downloadStream = gridFSBucket.openDownloadStreamByName(peep.avatar);
+
+                let chunks = [];
+                downloadStream.on('data', (chunk) => {
+                    chunks.push(chunk);
+                });
+
+                await new Promise((resolve, reject) => {
+                    downloadStream.on('end', () => {
+                        const buffer = Buffer.concat(chunks);
+                        avatarBase64 = buffer.toString('base64');
+                        resolve();
+                    });
+                    downloadStream.on('error', reject);
+                });
             } catch (err) {
                 console.error('Error fetching avatar:', err);
             }
         }
 
-        res.json(
-            {
-                "peep":
-                {
-                    ...peep.toObject(),
-                    avatarBase64,
-                }
+        res.json({
+            "peep": {
+                ...peep.toObject(),
+                avatarBase64,
             }
-        );
+        });
 
     } catch (error) {
         console.error('Error fetching similar users:', error);
@@ -203,33 +246,28 @@ router.get('/user/peep/:id', auth, async (req, res) => {
     }
 });
 
-// ? Get similar users based on interests from an external service
+// ? ? Get similar users based on interests from an external service
 router.get('/user/peeps', auth, async (req, res) => {
     try {
         const APP_ENGINE_URL = process.env.APP_ENGINE_URL;
         const userId = req.user.id;
 
-        // ? Fetching similar peeps data from an external service
         const response = await axios.get(`${APP_ENGINE_URL}similar/${userId}`);
         const similarPeeps = response.data;
 
         const similarPeepIds = Object.keys(similarPeeps.data);
-        console.log(similarPeepIds)
-        // ? Fetching user data for similar peeps
+
         const peeps = await User.find(
             { _id: { $in: similarPeepIds } },
             { liked: 0, password: 0 }
         );
 
-        // ? Mapping similarity scores to each user
         const similarityMap = new Map(Object.entries(similarPeeps.data));
         const combinedData = peeps.map(user => {
             const similarityScore = similarityMap.get(user._id.toString()) || null;
-
             return { ...user.toObject(), similarityScore };
         });
 
-        // ? Sorting users by similarity score
         combinedData.sort((a, b) => b.similarityScore - a.similarityScore);
 
         res.json({ peeps: combinedData });
