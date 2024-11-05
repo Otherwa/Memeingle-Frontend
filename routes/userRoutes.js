@@ -28,6 +28,22 @@ conn.once('open', () => {
 
 const upload = multer();
 
+var count = 0
+
+router.get('/ping', auth, (req, res) => {
+    count++;
+})
+
+router.get('/unping', auth, (req, res) => {
+    count--;
+})
+
+
+router.get('/count', auth, (req, res) => {
+    const activeUserCount = count;
+    res.json({ count: activeUserCount });
+})
+
 // ? ? Update User Data
 router.post('/user', auth, upload.single('avatar'), async (req, res) => {
     const { hobbies, bio, gender } = req.body;
@@ -46,7 +62,8 @@ router.post('/user', auth, upload.single('avatar'), async (req, res) => {
             // ? Check if the user already has an avatar, if so delete the old one
             const user = await User.findById(req.user.id);
             if (user.avatar) {
-                await gfs.remove({ filename: user.avatar, root: 'avatars' });
+                console.log(user.avatar)
+                await gfs.files.deleteOne({ filename: user.avatar });
             }
 
             // ? Store the new avatar in GridFS
@@ -159,7 +176,9 @@ router.post('/user/:id', auth, async (req, res) => {
         }
 
         let avatarBase64 = null;
+        console.log("Data" + user);
         if (user.avatar) {
+            console.log(user.avatar)
             try {
                 const downloadStream = gridFSBucket.openDownloadStreamByName(user.avatar);
 
