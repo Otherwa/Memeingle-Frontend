@@ -3,7 +3,6 @@ require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const http = require('http');
-const socketIo = require('socket.io');
 const cors = require('cors');
 const authRoutes = require('./routes/authRoutes');
 const messageRoutes = require('./routes/messageRoutes');
@@ -11,14 +10,17 @@ const userRoutes = require('./routes/userRoutes');
 const memeRoutes = require('./routes/memeRoutes');
 
 const initSocketServer = require('./socketserver');
+const compression = require('compression');
 
 const app = express();
 const server = http.createServer(app);
-const io = initSocketServer(server);
+// Messaging
+initSocketServer(server);
 
 // Middleware
 app.use(cors());
-app.use(express.json({ limit: '50mb' }));
+app.use(express.json({ limit: '20mb' }));
+app.use(compression());
 
 // Routes
 app.use('/api', authRoutes);
